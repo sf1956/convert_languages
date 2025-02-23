@@ -1,0 +1,1 @@
+python /path/to/your/python_script.py > /dev/null 2>&1 &
