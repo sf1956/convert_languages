@@ -18,9 +18,12 @@ class LanguageDetector:
         # Language models (for character frequency - used for language detection)
         self.en_freq = self.load_language_model("en")
         self.en_total = sum(self.en_freq.values())
+        self.he_freq = self.load_language_model("he")
+        self.he_total = sum(self.he_freq.values())
 
         # Word lists (for checking word validity - not used for language detection)
         self.english_words = set(words.words())
+        self.hebrew_words = self.load_hebrew_word_list("hebrew_words.txt")
 
         # Mappings (for conversion)
         self.en_to_he_mapping = {
@@ -56,7 +59,22 @@ class LanguageDetector:
                 ' ': 18.0
             })
         else:
-          return Counter()
+            return Counter({
+                'א': 4.4, 'ב': 2.1, 'ג': 1.3, 'ד': 1.8, 'ה': 3.5, 'ו': 4.2, 'ז': 0.9,
+                'ח': 1.2, 'ט': 1.1, 'י': 4.9, 'כ': 1.7, 'ל': 3.2, 'מ': 3.0, 'נ': 2.7,
+                'ס': 1.2, 'ע': 2.1, 'פ': 1.0, 'צ': 1.2, 'ק': 1.1, 'ר': 2.9, 'ש': 3.5, 'ת': 2.2,
+                'ך': 0.7, 'ם': 0.9, 'ן': 0.8, 'ף': 0.5, 'ץ': 0.4,
+                ' ': 18.0
+            })
+
+    def load_hebrew_word_list(self, filepath):
+        """Load a list of Hebrew words from a file."""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return set(line.strip() for line in f if line.strip())
+        except FileNotFoundError:
+            print(f"Warning: Hebrew word list file '{filepath}' not found. Hebrew word detection will be limited.")
+            return set()
 
     def detect_language_statistical(self, text):
         """Detect language using character frequency statistics."""
@@ -66,15 +84,28 @@ class LanguageDetector:
         en_score = 0
         for char in text.lower():
             en_score += self.en_freq.get(char, 0) / self.en_total
-        
-        if en_score>0:
-          return "en", en_score
-        else:
-          return "unknown", 0
+        he_score = 0
+        for char in text:
+            he_score += self.he_freq.get(char, 0) / self.he_total
+
+        total_score = en_score + he_score
+        if total_score > 0:
+            en_confidence = en_score / total_score
+            he_confidence = he_score / total_score
+            if en_confidence > he_confidence:
+                return "en", en_confidence
+            else:
+                return "he", he_confidence
+
+        return "unknown", 0
 
     def is_valid_english_word(self, word):
         """Check if a word is in the English dictionary."""
         return word.lower() in self.english_words
+
+    def is_valid_hebrew_word(self, word):
+        """Check if a word is in the Hebrew word list."""
+        return word in self.hebrew_words
 
     def convert_hebrew_to_english(self, hebrew_text):
         """Convert Hebrew text to English using the mapping."""
@@ -161,7 +192,6 @@ class LanguageDetector:
             print(f"KB=Unknown, Lang=Unknown, word={self.typed_text}")
 
         self.typed_text = ""
-
     def on_press(self, key):
         """Handle key press events."""
         try:
@@ -200,4 +230,3 @@ if __name__ == "__main__":
   finally:
       if 'detector' in locals():
           detector.stop()
-
